@@ -25,6 +25,7 @@ This is an evidence companion, not another deployment layer:
 | [`k3s-nvidia-edge`](https://github.com/Edge-Computing-LLM/k3s-nvidia-edge) | Ubuntu, k3s, NVIDIA runtime, GPU Operator, device plugin, and DCGM substrate |
 | [`llm-observability-stack`](https://github.com/Edge-Computing-LLM/llm-observability-stack) | Ollama/GGUF, Open WebUI, OpenTelemetry, Helm profiles, dashboards, and deployment configuration |
 | `qwen-gguf-observability` | Read-only Qwen runtime contract checks and sanitized point-in-time evidence |
+| [`Frontend-Edge-LLM-Observability`](https://github.com/Edge-Computing-LLM/Frontend-Edge-LLM-Observability) | TypeScript/Vue presentation of GPU and LLM observability data |
 
 It deliberately does not install k3s, NVIDIA software, Helm releases, Ollama,
 models, Open WebUI, or telemetry backends. It does not contain model weights or
@@ -61,6 +62,12 @@ upstream Tongyi Qianwen Research License before using the model.
 - a running Ollama pod in the target namespace
 
 No virtual environment and no third-party Python package are required.
+
+Python 3.11 is intentional here because the work is structured JSON collection,
+report generation, subprocess observation, and lightweight tests. Deployment
+orchestration remains in Go, browser behavior remains in TypeScript, and this
+repository does not grow Bash lifecycle scripts. See the organization
+[language boundaries](https://github.com/Edge-Computing-LLM/edge-cli/blob/main/docs/LANGUAGE-BOUNDARIES.md).
 
 ## Validate the live runtime
 
