@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+evidence/live-snapshot.json
+evidence/live-report.md
+evidence/smoke.json
+*.gguf
+*.bin
+.env

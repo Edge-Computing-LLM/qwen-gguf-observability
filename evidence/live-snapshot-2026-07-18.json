@@ -1,0 +1,183 @@
+{
+  "schema_version": "1.0",
+  "observed_at": "2026-07-17T19:43:03+00:00",
+  "scope": {
+    "namespace": "llm-observability",
+    "release": "llm-observability-stack",
+    "model": "qwen-1-8b-chat-q4-k-m-local",
+    "vram_ceiling_mib": 850
+  },
+  "host": {
+    "id": "ubuntu",
+    "version_id": "24.04",
+    "pretty_name": "Ubuntu 24.04.3 LTS",
+    "architecture": "x86_64",
+    "kernel": "6.17.0-40-generic"
+  },
+  "nvidia": {
+    "name": "NVIDIA GeForce 940M",
+    "driver_version": "580.95.05",
+    "memory_total_mib": 1024,
+    "memory_used_mib": 824,
+    "memory_free_mib": 152,
+    "utilization_percent": 0,
+    "temperature_c": 43
+  },
+  "kubernetes": {
+    "client_version": "v1.36.2+k3s1",
+    "server_version": "v1.36.2+k3s1",
+    "nvidia_runtimeclass": true,
+    "nodes": [
+      {
+        "name": "node-1",
+        "ready": true,
+        "os_image": "Ubuntu 24.04.3 LTS",
+        "kernel": "6.17.0-40-generic",
+        "container_runtime": "containerd://2.3.2-k3s2",
+        "gpu_present": true,
+        "gpu_capacity": 1,
+        "gpu_allocatable": 1
+      }
+    ],
+    "pods": [
+      {
+        "name": "ollama-5cd5fb5c8d-kgc66",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "open-webui-0",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "open-webui-redis-5b4b5b48d5-txxqp",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "opentelemetry-collector-7dd4d89978-95np4",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      }
+    ]
+  },
+  "helm": {
+    "name": "llm-observability-stack",
+    "namespace": "llm-observability",
+    "status": "deployed"
+  },
+  "ollama": {
+    "pod": "ollama-5cd5fb5c8d-kgc66",
+    "models": [
+      {
+        "name": "qwen-1-8b-chat-q4-k-m-local:latest",
+        "id": "f6460bca1635",
+        "size": "1.2 GB",
+        "modified": "26 minutes ago"
+      },
+      {
+        "name": "qwen:1.8b-chat-q4_K_M",
+        "id": "9c250efbd096",
+        "size": "1.2 GB",
+        "modified": "35 minutes ago"
+      }
+    ],
+    "running": [
+      {
+        "name": "qwen-1-8b-chat-q4-k-m-local:latest",
+        "id": "f6460bca1635",
+        "size": "1.1 GB",
+        "processor": "27%/73% CPU/GPU",
+        "context": "256",
+        "until": "Forever"
+      }
+    ],
+    "parameters": {
+      "num_ctx": 256,
+      "num_gpu": 23,
+      "num_predict": 128,
+      "temperature": 0,
+      "num_batch": 1,
+      "stop": [
+        "<|im_start|>",
+        "<|im_end|>"
+      ]
+    }
+  },
+  "checks": [
+    {
+      "name": "kubernetes-node-ready",
+      "passed": true,
+      "detail": "all observed nodes are Ready"
+    },
+    {
+      "name": "nvidia-gpu-allocatable",
+      "passed": true,
+      "detail": "at least one nvidia.com/gpu is allocatable"
+    },
+    {
+      "name": "nvidia-runtimeclass",
+      "passed": true,
+      "detail": "RuntimeClass/nvidia exists"
+    },
+    {
+      "name": "helm-release-deployed",
+      "passed": true,
+      "detail": "LLM stack Helm release is deployed"
+    },
+    {
+      "name": "workloads-ready",
+      "passed": true,
+      "detail": "all observed application containers are Ready"
+    },
+    {
+      "name": "qwen-registered",
+      "passed": true,
+      "detail": "expected local Qwen alias is registered"
+    },
+    {
+      "name": "qwen-resident",
+      "passed": true,
+      "detail": "expected local Qwen alias is loaded"
+    },
+    {
+      "name": "qwen-gpu-active",
+      "passed": true,
+      "detail": "Ollama reports GPU participation"
+    },
+    {
+      "name": "qwen-keep-alive",
+      "passed": true,
+      "detail": "Ollama reports Until=Forever"
+    },
+    {
+      "name": "vram-ceiling",
+      "passed": true,
+      "detail": "GPU memory stays at or below 850 MiB"
+    },
+    {
+      "name": "num-gpu-layers",
+      "passed": true,
+      "detail": "num_gpu is 23"
+    },
+    {
+      "name": "context-window",
+      "passed": true,
+      "detail": "num_ctx is 256"
+    },
+    {
+      "name": "batch-size",
+      "passed": true,
+      "detail": "num_batch is 1"
+    }
+  ],
+  "summary": {
+    "passed": 13,
+    "failed": 0
+  }
+}
