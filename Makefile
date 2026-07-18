@@ -1,17 +1,25 @@
-PYTHON ?= /usr/local/bin/python3.11
+GO ?= go
+BINARY ?= bin/qwen-observe
 
-.PHONY: check test validate snapshot
+.PHONY: build check test validate snapshot clean
+
+build:
+	@mkdir -p bin
+	$(GO) build -o $(BINARY) ./cmd/qwen-observe
 
 check: test
-	$(PYTHON) -m py_compile scripts/qwen_observe.py
+	$(GO) vet ./...
 	git diff --check
 
 test:
-	$(PYTHON) -m unittest discover -s tests -v
+	$(GO) test ./...
 
-validate:
-	$(PYTHON) scripts/qwen_observe.py validate
+validate: build
+	./$(BINARY) validate
 
-snapshot:
-	$(PYTHON) scripts/qwen_observe.py snapshot --output evidence/live-snapshot.json
-	$(PYTHON) scripts/qwen_observe.py report --input evidence/live-snapshot.json --output evidence/live-report.md
+snapshot: build
+	./$(BINARY) snapshot --output evidence/live-snapshot.json
+	./$(BINARY) report --input evidence/live-snapshot.json --output evidence/live-report.md
+
+clean:
+	rm -f $(BINARY)

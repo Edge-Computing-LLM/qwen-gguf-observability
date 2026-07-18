@@ -9,6 +9,6 @@ Before submitting changes:
 make check
 ```
 
-Use Python 3.11 and the standard library unless a dependency has a clear,
+Use Go 1.22 or newer and the standard library unless a dependency has a clear,
 documented operational benefit. Do not commit generated caches or sensitive
 runtime material.

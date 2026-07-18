@@ -4,7 +4,7 @@ Read-only runtime validation and sanitized evidence capture for a Qwen GGUF
 model served by Ollama on local Ubuntu + k3s + NVIDIA GPU systems.
 
 This repository documents the currently verified Qwen 1.8B Chat Q4_K_M runtime
-and provides a dependency-free Python 3.11 observer. It answers operational
+and provides a dependency-free Go observer. It answers operational
 questions such as:
 
 - Is the k3s node Ready and advertising `nvidia.com/gpu`?
@@ -25,7 +25,7 @@ This is an evidence companion, not another deployment layer:
 | [`k3s-nvidia-edge`](https://github.com/Edge-Computing-LLM/k3s-nvidia-edge) | Ubuntu, k3s, NVIDIA runtime, GPU Operator, device plugin, and DCGM substrate |
 | [`llm-observability-stack`](https://github.com/Edge-Computing-LLM/llm-observability-stack) | Ollama/GGUF, Open WebUI, OpenTelemetry, Helm profiles, dashboards, and deployment configuration |
 | `qwen-gguf-observability` | Read-only Qwen runtime contract checks and sanitized point-in-time evidence |
-| [`Frontend-Edge-LLM-Observability`](https://github.com/Edge-Computing-LLM/Frontend-Edge-LLM-Observability) | TypeScript/Vue presentation of GPU and LLM observability data |
+| Grafana dashboards in `llm-observability-stack` | Presentation of GPU, Kubernetes, Ollama, and LLM observability data |
 
 It deliberately does not install k3s, NVIDIA software, Helm releases, Ollama,
 models, Open WebUI, or telemetry backends. It does not contain model weights or
@@ -55,24 +55,23 @@ upstream Tongyi Qianwen Research License before using the model.
 
 ## Requirements
 
-- Python 3.11 (`/usr/local/bin/python3.11` on the verified host)
+- Go 1.22 or newer for source builds, or the prebuilt `qwen-observe` binary
 - `kubectl` configured for the target cluster
 - `helm`
 - host `nvidia-smi`
 - a running Ollama pod in the target namespace
 
-No virtual environment and no third-party Python package are required.
-
-Python 3.11 is intentional here because the work is structured JSON collection,
-report generation, subprocess observation, and lightweight tests. Deployment
-orchestration remains in Go, browser behavior remains in TypeScript, and this
-repository does not grow Bash lifecycle scripts. See the organization
+The observer uses only the Go standard library. It compiles to one static binary;
+no Python runtime, virtual environment, or third-party package is required.
+Deployment orchestration remains in Go and this repository does not grow Bash
+lifecycle scripts. See the organization
 [language boundaries](https://github.com/Edge-Computing-LLM/edge-cli/blob/main/docs/LANGUAGE-BOUNDARIES.md).
 
 ## Validate the live runtime
 
 ```bash
-/usr/local/bin/python3.11 scripts/qwen_observe.py validate
+make build
+./bin/qwen-observe validate
 ```
 
 The command is read-only. It exits non-zero if any runtime contract fails.
@@ -80,10 +79,10 @@ The command is read-only. It exits non-zero if any runtime contract fails.
 ## Capture sanitized evidence
 
 ```bash
-/usr/local/bin/python3.11 scripts/qwen_observe.py snapshot \
+./bin/qwen-observe snapshot \
   --output evidence/live-snapshot.json
 
-/usr/local/bin/python3.11 scripts/qwen_observe.py report \
+./bin/qwen-observe report \
   --input evidence/live-snapshot.json \
   --output evidence/live-report.md
 ```
@@ -95,7 +94,7 @@ content, environment variables, logs, prompts, model weights, and host IPs.
 ## Run an explicit inference smoke test
 
 ```bash
-/usr/local/bin/python3.11 scripts/qwen_observe.py smoke \
+./bin/qwen-observe smoke \
   --prompt "Reply with exactly: qwen observation ok" \
   --expect "qwen observation ok" \
   --output evidence/smoke.json

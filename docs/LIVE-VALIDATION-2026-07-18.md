@@ -1,7 +1,7 @@
 # Live validation — July 18, 2026
 
-This repository was validated against the existing local deployment without
-installing or changing any Kubernetes resource.
+The native Go observer was validated after a clean Layer 1 and Layer 2 Helm
+redeployment. The observer itself remained read-only.
 
 ## Environment
 
@@ -11,7 +11,8 @@ installing or changing any Kubernetes resource.
 - `RuntimeClass/nvidia` present.
 - One `nvidia.com/gpu` in node capacity and allocatable resources.
 - `k3s-nvidia-edge` Helm release deployed in `gpu-operator`.
-- `llm-observability-stack` Helm revision 6 deployed in `llm-observability`.
+- `llm-observability-stack` chart 0.3.0, Helm revision 1, deployed in
+  `llm-observability`.
 - Ollama, Open WebUI, Redis, and OpenTelemetry Collector Ready with zero
   application-container restarts after the Qwen rollout.
 
@@ -27,3 +28,5 @@ installing or changing any Kubernetes resource.
 
 The generated snapshot under `evidence/` is the machine-readable record. It is
 sanitized and intentionally narrower than a full Kubernetes support bundle.
+All 13 runtime-contract checks passed, and the explicit inference smoke test
+returned `qwen observation ok`.

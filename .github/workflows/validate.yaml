@@ -8,12 +8,14 @@ permissions:
   contents: read
 
 jobs:
-  python:
+  go:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-go@v6
         with:
-          python-version: "3.11"
-      - run: python3.11 -m unittest discover -s tests -v
-      - run: python3.11 -m py_compile scripts/qwen_observe.py
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./...
+      - run: go vet ./...
+      - run: git diff --check

@@ -1,6 +1,6 @@
 # Live Qwen GGUF observation
 
-Observed at `2026-07-17T19:43:03+00:00` using evidence schema `1.0`.
+Observed at `2026-07-18T07:28:33Z` using evidence schema `1.0`.
 
 ## Runtime
 
