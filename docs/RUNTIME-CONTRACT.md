@@ -30,5 +30,5 @@ QWEN_NAMESPACE=llm-observability \
 QWEN_RELEASE=llm-observability-stack \
 QWEN_MODEL=qwen-1-8b-chat-q4-k-m-local \
 QWEN_VRAM_CEILING_MIB=850 \
-/usr/local/bin/python3.11 scripts/qwen_observe.py validate
+./bin/qwen-observe validate
 ```
