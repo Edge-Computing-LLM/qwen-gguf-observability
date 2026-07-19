@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Edge-Computing-LLM/qwen-gguf-observability/internal/observer"
+	"github.com/Edge-Computing-LLM/gguf-observability/internal/observer"
 )
 
 func main() {

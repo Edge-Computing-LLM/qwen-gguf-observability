@@ -1,6 +1,7 @@
 package observer
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -35,14 +36,15 @@ func TestParseParameters(t *testing.T) {
 	}
 }
 func TestContract(t *testing.T) {
-	for _, c := range BuildChecks(fixture(), DefaultModel, 850) {
+	contract := Contract{Model: DefaultModel, VRAMCeilingMiB: 900, NumGPU: 23, NumCtx: 256, NumBatch: 1}
+	for _, c := range BuildChecks(fixture(), contract) {
 		if !c.Passed {
 			t.Errorf("expected %s to pass", c.Name)
 		}
 	}
 	s := fixture()
-	s.NVIDIA.MemoryUsedMiB = 860
-	for _, c := range BuildChecks(s, DefaultModel, 850) {
+	s.NVIDIA.MemoryUsedMiB = 901
+	for _, c := range BuildChecks(s, contract) {
 		if c.Name == "vram-ceiling" && c.Passed {
 			t.Fatal("expected VRAM check to fail")
 		}
@@ -63,5 +65,38 @@ func TestJSONRoundTrip(t *testing.T) {
 	}
 	if decoded.NVIDIA.MemoryUsedMiB != 824 {
 		t.Fatalf("snapshot: %#v", decoded)
+	}
+}
+
+func TestSmokeJSONExcludesPromptAndResponse(t *testing.T) {
+	result := SmokeResult{ObservedAt: "2026-07-19T00:00:00Z", Model: DefaultModel, DurationSeconds: 1.25, Passed: true, Response: "private response"}
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"private response", "prompt", "response", "expected_substring"} {
+		if bytes.Contains(data, []byte(forbidden)) {
+			t.Fatalf("smoke JSON contains %q: %s", forbidden, data)
+		}
+	}
+}
+
+func TestHelpIsSuccessful(t *testing.T) {
+	var output bytes.Buffer
+	if err := RunCLI([]string{"--help"}, &output); err != nil {
+		t.Fatalf("help failed: %v", err)
+	}
+	if !bytes.Contains(output.Bytes(), []byte("read-only GGUF")) {
+		t.Fatalf("unexpected help output: %s", output.String())
+	}
+}
+
+func TestReportSelectsExpectedRunningModel(t *testing.T) {
+	s := fixture()
+	s.Scope = map[string]any{"model": DefaultModel}
+	s.Ollama.Running = append([]RunningModel{{Name: "other-model", Processor: "CPU", Context: "1", Until: "5m"}}, s.Ollama.Running...)
+	report := RenderReport(s)
+	if !bytes.Contains([]byte(report), []byte("27%/73% CPU/GPU")) {
+		t.Fatalf("report selected the wrong running model:\n%s", report)
 	}
 }

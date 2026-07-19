@@ -1,11 +1,11 @@
 GO ?= go
-BINARY ?= bin/qwen-observe
+BINARY ?= bin/gguf-observe
 
 .PHONY: build check test validate snapshot clean
 
 build:
 	@mkdir -p bin
-	$(GO) build -o $(BINARY) ./cmd/qwen-observe
+	$(GO) build -o $(BINARY) ./cmd/gguf-observe
 
 check: test
 	$(GO) vet ./...

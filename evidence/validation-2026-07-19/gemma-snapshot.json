@@ -1,0 +1,214 @@
+{
+  "schema_version": "1.0",
+  "observed_at": "2026-07-19T07:01:03Z",
+  "scope": {
+    "expected_num_batch": 1,
+    "expected_num_ctx": 256,
+    "expected_num_gpu": 23,
+    "model": "gemma3-1b-it-gguf-local",
+    "namespace": "llm-observability",
+    "release": "llm-observability-stack",
+    "vram_ceiling_mib": 900
+  },
+  "host": {
+    "architecture": "amd64",
+    "id": "ubuntu",
+    "kernel": "6.17.0-40-generic",
+    "pretty_name": "Ubuntu 24.04.3 LTS",
+    "version_id": "24.04"
+  },
+  "nvidia": {
+    "name": "NVIDIA GeForce 940M",
+    "driver_version": "580.95.05",
+    "memory_total_mib": 1024,
+    "memory_used_mib": 450,
+    "memory_free_mib": 526,
+    "utilization_percent": 0,
+    "temperature_c": 55
+  },
+  "kubernetes": {
+    "client_version": "v1.36.2+k3s1",
+    "server_version": "v1.36.2+k3s1",
+    "nvidia_runtimeclass": true,
+    "nodes": [
+      {
+        "name": "node-1",
+        "ready": true,
+        "os_image": "Ubuntu 24.04.3 LTS",
+        "kernel": "6.17.0-40-generic",
+        "container_runtime": "containerd://2.3.2-k3s2",
+        "gpu_present": true,
+        "gpu_capacity": 1,
+        "gpu_allocatable": 1
+      }
+    ],
+    "pods": [
+      {
+        "name": "kube-prometheus-stack-operator-84569cbb56-9hc4j",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "llm-observability-stack-grafana-7bd785954c-mjg5h",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "llm-observability-stack-kube-state-metrics-84dff64b89-4q2xt",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "llm-observability-stack-prometheus-node-exporter-7mhvr",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "ollama-59f55dbf8b-fg47h",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "open-webui-0",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "open-webui-redis-5b4b5b48d5-mc2wm",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "opentelemetry-collector-7dd4d89978-hm6fw",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      },
+      {
+        "name": "prometheus-kube-prometheus-stack-prometheus-0",
+        "phase": "Running",
+        "ready": true,
+        "restarts": 0
+      }
+    ]
+  },
+  "helm": {
+    "name": "llm-observability-stack",
+    "namespace": "llm-observability",
+    "status": "deployed"
+  },
+  "ollama": {
+    "pod": "ollama-59f55dbf8b-fg47h",
+    "models": [
+      {
+        "name": "gemma3-1b-it-gguf-local:latest",
+        "id": "00f4d66f7f84",
+        "size": "806 MB",
+        "modified": "54 seconds ago"
+      }
+    ],
+    "running": [
+      {
+        "name": "gemma3-1b-it-gguf-local:latest",
+        "id": "00f4d66f7f84",
+        "size": "1.1 GB",
+        "processor": "62%/38% CPU/GPU",
+        "context": "256",
+        "until": "Forever"
+      }
+    ],
+    "parameters": {
+      "min_p": 0.01,
+      "num_batch": 1,
+      "num_ctx": 256,
+      "num_gpu": 23,
+      "num_predict": 128,
+      "repeat_penalty": 1,
+      "stop": [
+        "\u003cend_of_turn\u003e",
+        "\u003ceos\u003e"
+      ],
+      "temperature": 1,
+      "top_k": 64,
+      "top_p": 0.95
+    }
+  },
+  "checks": [
+    {
+      "name": "kubernetes-node-ready",
+      "passed": true,
+      "detail": "all observed nodes are Ready"
+    },
+    {
+      "name": "nvidia-gpu-allocatable",
+      "passed": true,
+      "detail": "at least one nvidia.com/gpu is allocatable"
+    },
+    {
+      "name": "nvidia-runtimeclass",
+      "passed": true,
+      "detail": "RuntimeClass/nvidia exists"
+    },
+    {
+      "name": "helm-release-deployed",
+      "passed": true,
+      "detail": "LLM stack Helm release is deployed"
+    },
+    {
+      "name": "workloads-ready",
+      "passed": true,
+      "detail": "all observed application containers are Ready"
+    },
+    {
+      "name": "model-registered",
+      "passed": true,
+      "detail": "expected Ollama model alias is registered"
+    },
+    {
+      "name": "model-resident",
+      "passed": true,
+      "detail": "expected Ollama model alias is loaded"
+    },
+    {
+      "name": "model-gpu-active",
+      "passed": true,
+      "detail": "Ollama reports GPU participation"
+    },
+    {
+      "name": "model-keep-alive",
+      "passed": true,
+      "detail": "Ollama reports Until=Forever"
+    },
+    {
+      "name": "vram-ceiling",
+      "passed": true,
+      "detail": "total observed GPU memory stays at or below 900 MiB"
+    },
+    {
+      "name": "num-gpu-layers",
+      "passed": true,
+      "detail": "num_gpu is 23"
+    },
+    {
+      "name": "context-window",
+      "passed": true,
+      "detail": "num_ctx is 256"
+    },
+    {
+      "name": "batch-size",
+      "passed": true,
+      "detail": "num_batch is 1"
+    }
+  ],
+  "summary": {
+    "passed": 13,
+    "failed": 0
+  }
+}

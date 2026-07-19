@@ -1,8 +1,7 @@
-# Qwen runtime contract
+# GGUF runtime contract
 
-The observer evaluates a narrow contract for the validated GeForce 940M
-profile. A failed check indicates runtime drift; it does not automatically
-modify the cluster.
+The observer evaluates a model-selectable contract for a local low-VRAM NVIDIA
+profile. A failed check reports runtime drift and never modifies the cluster.
 
 | Check | Expected state | Owning repository |
 |---|---|---|
@@ -10,25 +9,30 @@ modify the cluster.
 | GPU capacity | At least one allocatable `nvidia.com/gpu` | `k3s-nvidia-edge` |
 | RuntimeClass | `nvidia` handler exists | `k3s-nvidia-edge` |
 | Helm release | `llm-observability-stack` is deployed | `llm-observability-stack` |
-| Application pods | All containers Ready | `llm-observability-stack` |
-| Model registration | Qwen local alias exists | `llm-observability-stack` |
-| Model residency | Qwen appears in `ollama ps` | `llm-observability-stack` |
+| Application pods | All observed containers Ready | `llm-observability-stack` |
+| Model registration | Selected model alias exists | `llm-observability-stack` |
+| Model residency | Selected model appears in `ollama ps` | Ollama runtime |
 | GPU participation | Processor string contains `GPU` | Ollama runtime |
 | Keep-alive | `Until=Forever` | `llm-observability-stack` |
-| GPU memory | At most 850 MiB total observed use | GeForce profile |
-| GPU layers | `num_gpu=23` | Qwen Modelfile |
-| Context | `num_ctx=256` | Qwen Modelfile |
-| Batch | `num_batch=1` | Qwen Modelfile |
+| GPU memory | Total device use is at most the selected MiB ceiling | Host NVIDIA runtime |
+| Effective parameters | Selected values match when checks are enabled | Model Modelfile |
 
-The 850 value is MiB, not GB: the physical GeForce 940M has 1,024 MiB. Total
-device usage includes the Ollama runner and small host display allocations.
+The default ceiling is 900 MiB. It is an observed operational guardrail, not a
+hardware partition: this GeForce GPU does not provide MIG, and Kubernetes's
+`nvidia.com/gpu` resource allocates the whole device. `num_gpu` controls the
+number of model layers offloaded to CUDA; remaining layers execute from system
+RAM. Total `nvidia-smi` usage also includes small host display allocations.
 
-Override names and the ceiling without editing source:
+Example:
 
 ```bash
-QWEN_NAMESPACE=llm-observability \
-QWEN_RELEASE=llm-observability-stack \
-QWEN_MODEL=qwen-1-8b-chat-q4-k-m-local \
-QWEN_VRAM_CEILING_MIB=850 \
-./bin/qwen-observe validate
+GGUF_MODEL=qwen-1-8b-chat-q4-k-m-local \
+GGUF_VRAM_CEILING_MIB=900 \
+GGUF_EXPECTED_NUM_GPU=23 \
+GGUF_EXPECTED_NUM_CTX=256 \
+GGUF_EXPECTED_NUM_BATCH=1 \
+./bin/gguf-observe validate
 ```
+
+Set an expected parameter to `-1` to omit that one parameter assertion while
+retaining registration, residency, GPU participation, and VRAM checks.
