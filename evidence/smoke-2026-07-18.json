@@ -1,9 +1,6 @@
 {
   "observed_at": "2026-07-17T19:40:54+00:00",
   "model": "qwen-1-8b-chat-q4-k-m-local",
-  "prompt": "Reply with exactly: qwen observation ok",
-  "expected_substring": "qwen observation ok",
-  "response": "Qwen observation ok.",
   "duration_seconds": 1.777,
   "passed": true
 }

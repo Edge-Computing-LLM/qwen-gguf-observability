@@ -6,4 +6,5 @@ the verified local runtime. Generated convenience names such as
 local checks do not dirty the repository.
 
 Never commit model files, Secrets, kubeconfigs, access tokens, full pod logs,
-raw cluster dumps, or personally identifying prompts.
+raw cluster dumps, prompts, or model responses. Smoke JSON records only timing,
+model identity, and pass/fail status; the response is console-only.

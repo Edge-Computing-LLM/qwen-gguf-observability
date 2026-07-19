@@ -455,8 +455,12 @@ func RenderReport(s *Snapshot) string {
 	}
 	node := s.Kubernetes.Nodes[0]
 	resident := RunningModel{Processor: "not loaded", Context: "n/a", Until: "n/a"}
-	if len(s.Ollama.Running) > 0 {
-		resident = s.Ollama.Running[0]
+	model := text(s.Scope["model"], DefaultModel)
+	for _, running := range s.Ollama.Running {
+		if expectedModel(running.Name, model) {
+			resident = running
+			break
+		}
 	}
 	var checks strings.Builder
 	for _, c := range s.Checks {
@@ -470,13 +474,11 @@ func RenderReport(s *Snapshot) string {
 }
 
 type SmokeResult struct {
-	ObservedAt        string  `json:"observed_at"`
-	Model             string  `json:"model"`
-	Prompt            string  `json:"prompt"`
-	ExpectedSubstring string  `json:"expected_substring"`
-	Response          string  `json:"response"`
-	DurationSeconds   float64 `json:"duration_seconds"`
-	Passed            bool    `json:"passed"`
+	ObservedAt      string  `json:"observed_at"`
+	Model           string  `json:"model"`
+	DurationSeconds float64 `json:"duration_seconds"`
+	Passed          bool    `json:"passed"`
+	Response        string  `json:"-"`
 }
 
 func Smoke(r Runner, namespace, model, prompt, expected string) (*SmokeResult, error) {
@@ -494,7 +496,7 @@ func Smoke(r Runner, namespace, model, prompt, expected string) (*SmokeResult, e
 		return nil, err
 	}
 	passed := strings.TrimSpace(response) != "" && (expected == "" || strings.Contains(strings.ToLower(response), strings.ToLower(expected)))
-	return &SmokeResult{time.Now().UTC().Truncate(time.Second).Format(time.RFC3339), model, prompt, expected, strings.TrimSpace(response), float64(time.Since(started).Milliseconds()) / 1000, passed}, nil
+	return &SmokeResult{time.Now().UTC().Truncate(time.Second).Format(time.RFC3339), model, float64(time.Since(started).Milliseconds()) / 1000, passed, strings.TrimSpace(response)}, nil
 }
 func env(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
@@ -504,6 +506,23 @@ func env(key, fallback string) string {
 }
 
 func RunCLI(args []string, stdout io.Writer) error {
+	const usage = `qwen-observe is a read-only Qwen GGUF runtime evidence CLI.
+
+Usage:
+  qwen-observe [global flags] <validate|snapshot|report|smoke> [command flags]
+
+Global flags:
+  --namespace NAME
+  --release NAME
+  --model NAME
+  --vram-ceiling-mib NUMBER
+
+Run qwen-observe <command> --help for command flags.
+`
+	if len(args) > 0 && (args[0] == "-h" || args[0] == "--help" || args[0] == "help") {
+		fmt.Fprint(stdout, usage)
+		return nil
+	}
 	root := flag.NewFlagSet("qwen-observe", flag.ContinueOnError)
 	root.SetOutput(io.Discard)
 	namespace := root.String("namespace", env("QWEN_NAMESPACE", DefaultNamespace), "Kubernetes namespace")
@@ -512,6 +531,10 @@ func RunCLI(args []string, stdout io.Writer) error {
 	ceilingDefault, _ := strconv.Atoi(env("QWEN_VRAM_CEILING_MIB", "850"))
 	ceiling := root.Int("vram-ceiling-mib", ceilingDefault, "VRAM ceiling in MiB")
 	if err := root.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fmt.Fprint(stdout, usage)
+			return nil
+		}
 		return &ExitError{2, err}
 	}
 	remaining := root.Args()
@@ -519,6 +542,14 @@ func RunCLI(args []string, stdout io.Writer) error {
 		return &ExitError{2, errors.New("command required: validate, snapshot, report, or smoke")}
 	}
 	command, commandArgs, runner := remaining[0], remaining[1:], CommandRunner{}
+	if command == "help" {
+		fmt.Fprint(stdout, usage)
+		return nil
+	}
+	if len(commandArgs) > 0 && (commandArgs[0] == "-h" || commandArgs[0] == "--help") {
+		fmt.Fprint(stdout, usage)
+		return nil
+	}
 	switch command {
 	case "validate", "snapshot":
 		flags := flag.NewFlagSet(command, flag.ContinueOnError)
