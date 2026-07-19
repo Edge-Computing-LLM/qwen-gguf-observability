@@ -1,0 +1,6 @@
+{
+  "observed_at": "2026-07-19T07:07:39Z",
+  "model": "llama3-2-1b-local",
+  "duration_seconds": 1.591,
+  "passed": true
+}

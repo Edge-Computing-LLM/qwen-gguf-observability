@@ -36,14 +36,15 @@ func TestParseParameters(t *testing.T) {
 	}
 }
 func TestContract(t *testing.T) {
-	for _, c := range BuildChecks(fixture(), DefaultModel, 850) {
+	contract := Contract{Model: DefaultModel, VRAMCeilingMiB: 900, NumGPU: 23, NumCtx: 256, NumBatch: 1}
+	for _, c := range BuildChecks(fixture(), contract) {
 		if !c.Passed {
 			t.Errorf("expected %s to pass", c.Name)
 		}
 	}
 	s := fixture()
-	s.NVIDIA.MemoryUsedMiB = 860
-	for _, c := range BuildChecks(s, DefaultModel, 850) {
+	s.NVIDIA.MemoryUsedMiB = 901
+	for _, c := range BuildChecks(s, contract) {
 		if c.Name == "vram-ceiling" && c.Passed {
 			t.Fatal("expected VRAM check to fail")
 		}
@@ -85,7 +86,7 @@ func TestHelpIsSuccessful(t *testing.T) {
 	if err := RunCLI([]string{"--help"}, &output); err != nil {
 		t.Fatalf("help failed: %v", err)
 	}
-	if !bytes.Contains(output.Bytes(), []byte("read-only Qwen GGUF")) {
+	if !bytes.Contains(output.Bytes(), []byte("read-only GGUF")) {
 		t.Fatalf("unexpected help output: %s", output.String())
 	}
 }

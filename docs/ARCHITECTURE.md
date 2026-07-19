@@ -1,6 +1,6 @@
 # Architecture and ownership boundaries
 
-`qwen-gguf-observability` is a read-only evidence plane beside the deployable
+`gguf-observability` is a read-only evidence plane beside the deployable
 platform layers. It consumes public operational interfaces and owns no cluster
 resources.
 
@@ -11,13 +11,13 @@ edge-cli (workflow control plane)
   |      |
   |      +--> RuntimeClass/nvidia, nvidia.com/gpu, DCGM
   |
-  +--> llm-observability-stack (Ollama, Qwen, WebUI, telemetry)
+  +--> llm-observability-stack (Ollama, GGUF models, WebUI, telemetry)
           |
           +--> kubectl / Helm / Ollama status
                          |
                          v
-             qwen-gguf-observability
-             read-only contract + evidence
+                  gguf-observability
+              read-only contract + evidence
 ```
 
 ## Inputs
@@ -27,22 +27,24 @@ edge-cli (workflow control plane)
 - Ollama CLI inside the existing pod for model inventory, residency, and
   effective parameters.
 - Host `nvidia-smi` for actual device memory and utilization.
+- Operator-selected model alias, VRAM ceiling, and optional parameter contract.
 
 ## Outputs
 
 - Human-readable validation results.
 - A versioned, sanitized JSON evidence document.
 - Markdown generated from that JSON document.
-- Optional explicit inference smoke-test evidence.
+- Optional explicit inference smoke-test evidence without prompt or response
+  content.
 
 ## Non-goals
 
 - Installing, upgrading, or deleting Kubernetes resources.
 - Pulling, creating, stopping, or deleting Ollama models.
 - Defining Helm values or Modelfiles.
-- Replacing full metrics pipelines, Grafana, Prometheus, OpenTelemetry, or DCGM.
-- Storing GGUF binaries, credentials, Secrets, kubeconfigs, logs, or raw cluster
-  dumps.
+- Replacing metrics pipelines, Grafana, Prometheus, OpenTelemetry, or DCGM.
+- Storing GGUF binaries, credentials, Secrets, kubeconfigs, logs, prompts,
+  responses, or raw cluster dumps.
 
 This separation prevents drift: deployment policy remains in
 `llm-observability-stack`, infrastructure policy remains in `k3s-nvidia-edge`,

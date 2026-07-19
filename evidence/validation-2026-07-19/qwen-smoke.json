@@ -1,0 +1,6 @@
+{
+  "observed_at": "2026-07-19T07:02:26Z",
+  "model": "qwen-1-8b-chat-q4-k-m-local",
+  "duration_seconds": 1.932,
+  "passed": true
+}

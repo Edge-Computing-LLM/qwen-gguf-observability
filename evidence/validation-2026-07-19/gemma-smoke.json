@@ -1,0 +1,6 @@
+{
+  "observed_at": "2026-07-19T07:00:59Z",
+  "model": "gemma3-1b-it-gguf-local",
+  "duration_seconds": 1.297,
+  "passed": true
+}

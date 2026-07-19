@@ -23,6 +23,7 @@ const (
 	DefaultNamespace = "llm-observability"
 	DefaultRelease   = "llm-observability-stack"
 	DefaultModel     = "qwen-1-8b-chat-q4-k-m-local"
+	DefaultVRAMMiB   = 900
 )
 
 type ExitError struct {
@@ -208,7 +209,16 @@ func parameterInt(parameters map[string]any, key string) int {
 		return -1
 	}
 }
-func BuildChecks(s *Snapshot, model string, ceiling int) []Check {
+
+type Contract struct {
+	Model          string
+	VRAMCeilingMiB int
+	NumGPU         int
+	NumCtx         int
+	NumBatch       int
+}
+
+func BuildChecks(s *Snapshot, contract Contract) []Check {
 	nodesReady, podsReady, gpuAllocatable := len(s.Kubernetes.Nodes) > 0, len(s.Kubernetes.Pods) > 0, false
 	for _, n := range s.Kubernetes.Nodes {
 		nodesReady = nodesReady && n.Ready
@@ -219,30 +229,41 @@ func BuildChecks(s *Snapshot, model string, ceiling int) []Check {
 	}
 	registered := false
 	for _, m := range s.Ollama.Models {
-		registered = registered || expectedModel(m.Name, model)
+		registered = registered || expectedModel(m.Name, contract.Model)
 	}
 	var resident *RunningModel
 	for i := range s.Ollama.Running {
-		if expectedModel(s.Ollama.Running[i].Name, model) {
+		if expectedModel(s.Ollama.Running[i].Name, contract.Model) {
 			resident = &s.Ollama.Running[i]
 			break
 		}
 	}
-	return []Check{
+	checks := []Check{
 		{"kubernetes-node-ready", nodesReady, "all observed nodes are Ready"},
 		{"nvidia-gpu-allocatable", gpuAllocatable, "at least one nvidia.com/gpu is allocatable"},
 		{"nvidia-runtimeclass", s.Kubernetes.NVIDIARuntimeClass, "RuntimeClass/nvidia exists"},
 		{"helm-release-deployed", s.Helm.Status == "deployed", "LLM stack Helm release is deployed"},
 		{"workloads-ready", podsReady, "all observed application containers are Ready"},
-		{"qwen-registered", registered, "expected local Qwen alias is registered"},
-		{"qwen-resident", resident != nil, "expected local Qwen alias is loaded"},
-		{"qwen-gpu-active", resident != nil && strings.Contains(resident.Processor, "GPU"), "Ollama reports GPU participation"},
-		{"qwen-keep-alive", resident != nil && resident.Until == "Forever", "Ollama reports Until=Forever"},
-		{"vram-ceiling", s.NVIDIA.MemoryUsedMiB <= ceiling, fmt.Sprintf("GPU memory stays at or below %d MiB", ceiling)},
-		{"num-gpu-layers", parameterInt(s.Ollama.Parameters, "num_gpu") == 23, "num_gpu is 23"},
-		{"context-window", parameterInt(s.Ollama.Parameters, "num_ctx") == 256, "num_ctx is 256"},
-		{"batch-size", parameterInt(s.Ollama.Parameters, "num_batch") == 1, "num_batch is 1"},
+		{"model-registered", registered, "expected Ollama model alias is registered"},
+		{"model-resident", resident != nil, "expected Ollama model alias is loaded"},
+		{"model-gpu-active", resident != nil && strings.Contains(resident.Processor, "GPU"), "Ollama reports GPU participation"},
+		{"model-keep-alive", resident != nil && resident.Until == "Forever", "Ollama reports Until=Forever"},
+		{"vram-ceiling", s.NVIDIA.MemoryUsedMiB <= contract.VRAMCeilingMiB, fmt.Sprintf("total observed GPU memory stays at or below %d MiB", contract.VRAMCeilingMiB)},
 	}
+	for _, expected := range []struct {
+		name  string
+		key   string
+		value int
+	}{
+		{"num-gpu-layers", "num_gpu", contract.NumGPU},
+		{"context-window", "num_ctx", contract.NumCtx},
+		{"batch-size", "num_batch", contract.NumBatch},
+	} {
+		if expected.value >= 0 {
+			checks = append(checks, Check{expected.name, parameterInt(s.Ollama.Parameters, expected.key) == expected.value, fmt.Sprintf("%s is %d", expected.key, expected.value)})
+		}
+	}
+	return checks
 }
 
 func get(object map[string]any, path ...string) any {
@@ -351,7 +372,7 @@ func nvidiaSnapshot(r Runner) (GPU, error) {
 	return GPU{row[0], row[1], integer(row[2]), integer(row[3]), integer(row[4]), integer(row[5]), integer(row[6])}, nil
 }
 
-func CollectSnapshot(r Runner, namespace, release, model string, ceiling int) (*Snapshot, error) {
+func CollectSnapshot(r Runner, namespace, release string, contract Contract) (*Snapshot, error) {
 	nodesJSON, err := commandJSON(r, "kubectl", "get", "nodes", "-o", "json")
 	if err != nil {
 		return nil, err
@@ -386,7 +407,7 @@ func CollectSnapshot(r Runner, namespace, release, model string, ceiling int) (*
 	if err != nil {
 		return nil, err
 	}
-	parametersOutput, err := r.Run(append(base, "show", model, "--parameters")...)
+	parametersOutput, err := r.Run(append(base, "show", contract.Model, "--parameters")...)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +415,7 @@ func CollectSnapshot(r Runner, namespace, release, model string, ceiling int) (*
 	if err != nil {
 		return nil, err
 	}
-	s := &Snapshot{SchemaVersion: SchemaVersion, ObservedAt: time.Now().UTC().Truncate(time.Second).Format(time.RFC3339), Scope: map[string]any{"namespace": namespace, "release": release, "model": model, "vram_ceiling_mib": ceiling}, Host: parseOSRelease(), NVIDIA: gpu}
+	s := &Snapshot{SchemaVersion: SchemaVersion, ObservedAt: time.Now().UTC().Truncate(time.Second).Format(time.RFC3339), Scope: map[string]any{"namespace": namespace, "release": release, "model": contract.Model, "vram_ceiling_mib": contract.VRAMCeilingMiB, "expected_num_gpu": contract.NumGPU, "expected_num_ctx": contract.NumCtx, "expected_num_batch": contract.NumBatch}, Host: parseOSRelease(), NVIDIA: gpu}
 	s.Host["architecture"] = runtime.GOARCH
 	if kernel, err := r.Run("uname", "-r"); err == nil {
 		s.Host["kernel"] = kernel
@@ -416,7 +437,7 @@ func CollectSnapshot(r Runner, namespace, release, model string, ceiling int) (*
 	s.Ollama.Models = ParseOllamaList(listOutput)
 	s.Ollama.Running = ParseOllamaPS(psOutput)
 	s.Ollama.Parameters = ParseParameters(parametersOutput)
-	s.Checks = BuildChecks(s, model, ceiling)
+	s.Checks = BuildChecks(s, contract)
 	for _, check := range s.Checks {
 		if check.Passed {
 			s.Summary.Passed++
@@ -451,7 +472,7 @@ func RenderValidation(s *Snapshot) string {
 }
 func RenderReport(s *Snapshot) string {
 	if len(s.Kubernetes.Nodes) == 0 {
-		return "# Live Qwen GGUF observation\n\nNo nodes were observed.\n"
+		return "# Live GGUF model observation\n\nNo nodes were observed.\n"
 	}
 	node := s.Kubernetes.Nodes[0]
 	resident := RunningModel{Processor: "not loaded", Context: "n/a", Until: "n/a"}
@@ -470,7 +491,7 @@ func RenderReport(s *Snapshot) string {
 		}
 		fmt.Fprintf(&checks, "| %s | %s | %s |\n", c.Name, result, c.Detail)
 	}
-	return fmt.Sprintf("# Live Qwen GGUF observation\n\nObserved at `%s` using evidence schema `%s`.\n\n## Runtime\n\n| Field | Observed value |\n|---|---|\n| Host | %s |\n| Kubernetes | %s |\n| Node | %s (Ready: %t) |\n| GPU | %s (%d MiB) |\n| GPU memory | %d MiB used / %d MiB free |\n| Model | `%v` |\n| Processor split | %s |\n| Context | %s |\n| Residency | %s |\n| Helm release | %s (%s) |\n\n## Checks\n\n| Check | Result | Contract |\n|---|---|---|\n%s\nThis report contains selected operational facts only. It excludes Secrets,\nkubeconfig data, environment variables, pod logs, and model weights.\n", s.ObservedAt, s.SchemaVersion, text(s.Host["pretty_name"], "unknown"), s.Kubernetes.ServerVersion, node.Name, node.Ready, s.NVIDIA.Name, s.NVIDIA.MemoryTotalMiB, s.NVIDIA.MemoryUsedMiB, s.NVIDIA.MemoryFreeMiB, s.Scope["model"], resident.Processor, resident.Context, resident.Until, s.Helm.Name, s.Helm.Status, checks.String())
+	return fmt.Sprintf("# Live GGUF model observation\n\nObserved at `%s` using evidence schema `%s`.\n\n## Runtime\n\n| Field | Observed value |\n|---|---|\n| Host | %s |\n| Kubernetes | %s |\n| Node | %s (Ready: %t) |\n| GPU | %s (%d MiB) |\n| GPU memory | %d MiB used / %d MiB free |\n| Model | `%v` |\n| Processor split | %s |\n| Context | %s |\n| Residency | %s |\n| Helm release | %s (%s) |\n\n## Checks\n\n| Check | Result | Contract |\n|---|---|---|\n%s\nThis report contains selected operational facts only. It excludes Secrets,\nkubeconfig data, environment variables, pod logs, prompts, responses, and model weights.\n", s.ObservedAt, s.SchemaVersion, text(s.Host["pretty_name"], "unknown"), s.Kubernetes.ServerVersion, node.Name, node.Ready, s.NVIDIA.Name, s.NVIDIA.MemoryTotalMiB, s.NVIDIA.MemoryUsedMiB, s.NVIDIA.MemoryFreeMiB, s.Scope["model"], resident.Processor, resident.Context, resident.Until, s.Helm.Name, s.Helm.Status, checks.String())
 }
 
 type SmokeResult struct {
@@ -506,30 +527,40 @@ func env(key, fallback string) string {
 }
 
 func RunCLI(args []string, stdout io.Writer) error {
-	const usage = `qwen-observe is a read-only Qwen GGUF runtime evidence CLI.
+	const usage = `gguf-observe is a read-only GGUF runtime evidence CLI.
 
 Usage:
-  qwen-observe [global flags] <validate|snapshot|report|smoke> [command flags]
+  gguf-observe [global flags] <validate|snapshot|report|smoke> [command flags]
 
 Global flags:
   --namespace NAME
   --release NAME
   --model NAME
   --vram-ceiling-mib NUMBER
+  --expected-num-gpu NUMBER
+  --expected-num-ctx NUMBER
+  --expected-num-batch NUMBER
 
-Run qwen-observe <command> --help for command flags.
+Use -1 for an expected parameter to skip that parameter check.
+Run gguf-observe <command> --help for command flags.
 `
 	if len(args) > 0 && (args[0] == "-h" || args[0] == "--help" || args[0] == "help") {
 		fmt.Fprint(stdout, usage)
 		return nil
 	}
-	root := flag.NewFlagSet("qwen-observe", flag.ContinueOnError)
+	root := flag.NewFlagSet("gguf-observe", flag.ContinueOnError)
 	root.SetOutput(io.Discard)
-	namespace := root.String("namespace", env("QWEN_NAMESPACE", DefaultNamespace), "Kubernetes namespace")
-	release := root.String("release", env("QWEN_RELEASE", DefaultRelease), "Helm release")
-	model := root.String("model", env("QWEN_MODEL", DefaultModel), "Ollama model")
-	ceilingDefault, _ := strconv.Atoi(env("QWEN_VRAM_CEILING_MIB", "850"))
+	namespace := root.String("namespace", env("GGUF_NAMESPACE", DefaultNamespace), "Kubernetes namespace")
+	release := root.String("release", env("GGUF_RELEASE", DefaultRelease), "Helm release")
+	model := root.String("model", env("GGUF_MODEL", DefaultModel), "Ollama model")
+	ceilingDefault, _ := strconv.Atoi(env("GGUF_VRAM_CEILING_MIB", strconv.Itoa(DefaultVRAMMiB)))
 	ceiling := root.Int("vram-ceiling-mib", ceilingDefault, "VRAM ceiling in MiB")
+	numGPUDefault, _ := strconv.Atoi(env("GGUF_EXPECTED_NUM_GPU", "23"))
+	numCtxDefault, _ := strconv.Atoi(env("GGUF_EXPECTED_NUM_CTX", "256"))
+	numBatchDefault, _ := strconv.Atoi(env("GGUF_EXPECTED_NUM_BATCH", "1"))
+	numGPU := root.Int("expected-num-gpu", numGPUDefault, "expected num_gpu; -1 skips")
+	numCtx := root.Int("expected-num-ctx", numCtxDefault, "expected num_ctx; -1 skips")
+	numBatch := root.Int("expected-num-batch", numBatchDefault, "expected num_batch; -1 skips")
 	if err := root.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			fmt.Fprint(stdout, usage)
@@ -559,7 +590,8 @@ Run qwen-observe <command> --help for command flags.
 		if err := flags.Parse(commandArgs); err != nil {
 			return &ExitError{2, err}
 		}
-		s, err := CollectSnapshot(runner, *namespace, *release, *model, *ceiling)
+		contract := Contract{Model: *model, VRAMCeilingMiB: *ceiling, NumGPU: *numGPU, NumCtx: *numCtx, NumBatch: *numBatch}
+		s, err := CollectSnapshot(runner, *namespace, *release, contract)
 		if err != nil {
 			return &ExitError{2, err}
 		}
@@ -611,8 +643,8 @@ Run qwen-observe <command> --help for command flags.
 	case "smoke":
 		flags := flag.NewFlagSet(command, flag.ContinueOnError)
 		flags.SetOutput(io.Discard)
-		prompt := flags.String("prompt", "Reply with exactly: qwen observation ok", "prompt")
-		expect := flags.String("expect", "qwen observation ok", "expected substring")
+		prompt := flags.String("prompt", "Reply with exactly: observation ok", "prompt")
+		expect := flags.String("expect", "observation ok", "expected substring")
 		output := flags.String("output", "", "optional output")
 		if err := flags.Parse(commandArgs); err != nil {
 			return &ExitError{2, err}
